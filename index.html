@@ -406,34 +406,44 @@
       const hasDigit  = /[0-9]/.test(password);
       const hasSymbol = /[^a-zA-Z0-9]/.test(password);
 
-      let size = 0;
+      let size = 0n;
       const parts = [];
-      if (hasLower)  { size += 26; parts.push('lowercase'); }
-      if (hasUpper)  { size += 26; parts.push('uppercase'); }
-      if (hasDigit)  { size += 10; parts.push('digits'); }
-      if (hasSymbol) { size += 32; parts.push('symbols'); }
+      if (hasLower)  { size += 26n; parts.push('lowercase'); }
+      if (hasUpper)  { size += 26n; parts.push('uppercase'); }
+      if (hasDigit)  { size += 10n; parts.push('digits'); }
+      if (hasSymbol) { size += 32n; parts.push('symbols'); }
 
       return { size, parts };
     }
 
+    // Humanize a BigInt number of seconds into readable text
     function humanizeTime(seconds) {
-      if (seconds < 1)           return { text: 'Less than a second', speed: 'fast' };
-      if (seconds < 60)          return { text: `${Math.floor(seconds)} seconds`, speed: 'fast' };
-      if (seconds < 3600)        return { text: `${Math.floor(seconds / 60)} minutes`, speed: 'fast' };
-      if (seconds < 86400)       return { text: `${Math.floor(seconds / 3600)} hours`, speed: 'fast' };
-      if (seconds < 31536000)    return { text: `${Math.floor(seconds / 86400)} days`, speed: 'medium' };
-      if (seconds < 3.154e9)     return { text: `${Math.floor(seconds / 31536000)} years`, speed: 'medium' };
-      if (seconds < 3.154e12)    return { text: `${Math.floor(seconds / 3.154e9).toLocaleString()} thousand years`, speed: 'slow' };
-      if (seconds < 3.154e15)    return { text: `${Math.floor(seconds / 3.154e12).toLocaleString()} million years`, speed: 'slow' };
-      return { text: 'Longer than civilization', speed: 'slow' };
+      const SEC  = 1n;
+      const MIN  = 60n;
+      const HOUR = 3600n;
+      const DAY  = 86400n;
+      const YEAR = 31536000n;
+      const KILO = YEAR * 1000n;
+      const MEGA = YEAR * 1000000n;
+      const GIGA = YEAR * 1000000000n;
+
+      if (seconds < 1n)    return { text: 'Less than a second',           speed: 'fast' };
+      if (seconds < MIN)   return { text: `${seconds} seconds`,           speed: 'fast' };
+      if (seconds < HOUR)  return { text: `${seconds / MIN} minutes`,     speed: 'fast' };
+      if (seconds < DAY)   return { text: `${seconds / HOUR} hours`,      speed: 'fast' };
+      if (seconds < YEAR)  return { text: `${seconds / DAY} days`,        speed: 'medium' };
+      if (seconds < KILO)  return { text: `${seconds / YEAR} years`,      speed: 'medium' };
+      if (seconds < MEGA)  return { text: `${(seconds / KILO).toLocaleString()} thousand years`,  speed: 'slow' };
+      if (seconds < GIGA)  return { text: `${(seconds / MEGA).toLocaleString()} million years`,   speed: 'slow' };
+      return                      { text: 'Longer than civilization',     speed: 'slow' };
     }
 
     function strengthLabel(seconds) {
-      if (seconds < 60)       return { label: 'Very Weak',   cls: 'very-weak' };
-      if (seconds < 86400)    return { label: 'Weak',        cls: 'weak' };
-      if (seconds < 31536000) return { label: 'Moderate',    cls: 'moderate' };
-      if (seconds < 3.154e9)  return { label: 'Strong',      cls: 'strong' };
-      return                         { label: 'Very Strong', cls: 'very-strong' };
+      if (seconds < 60n)         return { label: 'Very Weak',   cls: 'very-weak' };
+      if (seconds < 86400n)      return { label: 'Weak',        cls: 'weak' };
+      if (seconds < 31536000n)   return { label: 'Moderate',    cls: 'moderate' };
+      if (seconds < 3154000000n) return { label: 'Strong',      cls: 'strong' };
+      return                            { label: 'Very Strong', cls: 'very-strong' };
     }
 
     function analyze() {
@@ -441,41 +451,44 @@
       if (!password) return;
 
       const { size: charsetSize, parts } = getCharsetSize(password);
-      const length = password.length;
+      const length = BigInt(password.length);
 
-      // Use BigInt for large keyspace, fall back to number for display
-      let keyspace;
-      try {
-        keyspace = BigInt(charsetSize) ** BigInt(length);
-      } catch(e) {
-        keyspace = Math.pow(charsetSize, length);
+      // Full BigInt keyspace — no precision loss
+      const keyspace = charsetSize ** length;
+
+      // Format keyspace for display (abbreviate if huge)
+      let keyspaceDisplay;
+      if (keyspace < 1000000000000n) {
+        keyspaceDisplay = keyspace.toLocaleString();
+      } else {
+        // Scientific-style display
+        const s = keyspace.toString();
+        keyspaceDisplay = `${s[0]}.${s.slice(1,4)}... × 10^${s.length - 1}`;
       }
-
-      const keyspaceNum = Number(keyspace);
 
       // Meta chips
       const metaRow = document.getElementById('meta-row');
       metaRow.innerHTML = `
-        <div class="meta-chip"><strong>${length}</strong> characters</div>
+        <div class="meta-chip"><strong>${password.length}</strong> characters</div>
         <div class="meta-chip">Sets: <strong>${parts.join(', ')}</strong></div>
-        <div class="meta-chip">Keyspace: <strong>${keyspace.toLocaleString()}</strong></div>
+        <div class="meta-chip">Combinations: <strong>${keyspaceDisplay}</strong></div>
       `;
 
-      // Scenarios
+      // Scenarios — all BigInt division
       const scenarios = [
-        { name: 'Online attack (rate-limited)', speed: 100 },
-        { name: 'Offline — strong hash (bcrypt)', speed: 10_000 },
-        { name: 'Offline — weak hash (MD5)', speed: 10_000_000_000 },
-        { name: 'High-end GPU cluster', speed: 100_000_000_000 },
+        { name: 'Online attack (rate-limited)',     speed: 100n },
+        { name: 'Offline — strong hash (bcrypt)',   speed: 10_000n },
+        { name: 'Offline — weak hash (MD5)',        speed: 10_000_000_000n },
+        { name: 'High-end GPU cluster',             speed: 100_000_000_000n },
       ];
 
       const scenariosEl = document.getElementById('scenarios');
       scenariosEl.innerHTML = '';
-      let worstCaseSeconds = 0;
+      let worstCaseSeconds = 0n;
 
       scenarios.forEach(({ name, speed }) => {
-        const seconds = keyspaceNum / speed;
-        if (speed === 100_000_000_000) worstCaseSeconds = seconds;
+        const seconds = keyspace / speed;
+        if (speed === 100_000_000_000n) worstCaseSeconds = seconds;
         const { text, speed: spd } = humanizeTime(seconds);
 
         const card = document.createElement('div');
@@ -497,7 +510,7 @@
       const resultsEl = document.getElementById('results');
       resultsEl.style.display = 'block';
       resultsEl.style.animation = 'none';
-      resultsEl.offsetHeight; // reflow
+      resultsEl.offsetHeight;
       resultsEl.style.animation = 'fadeUp 0.3s ease';
       resultsEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
