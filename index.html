@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BreakTime — Password Brute Force Estimator</title>
+  <link href="https://fonts.googleapis.com/css2?family=Syne+Mono&family=Syne:wght@400;600;800&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #080b0f;
+      --surface: #0d1117;
+      --border: #1e2730;
+      --cyan: #00d4ff;
+      --magenta: #ff2d78;
+      --amber: #ffb300;
+      --text: #c9d1d9;
+      --muted: #58677a;
+      --mono: 'Syne Mono', monospace;
+      --sans: 'Syne', sans-serif;
+    }
+
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--sans);
+      font-size: 16px;
+      line-height: 1.6;
+    }
+
+    body {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+      padding: 60px 20px 80px;
+    }
+
+    /* Subtle grid background */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(var(--border) 1px, transparent 1px),
+        linear-gradient(90deg, var(--border) 1px, transparent 1px);
+      background-size: 40px 40px;
+      opacity: 0.3;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .wrapper {
+      position: relative;
+      z-index: 1;
+      width: 100%;
+      max-width: 680px;
+    }
+
+    /* Header */
+    header {
+      margin-bottom: 52px;
+    }
+
+    .tag {
+      font-family: var(--mono);
+      font-size: 11px;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--cyan);
+      margin-bottom: 12px;
+    }
+
+    h1 {
+      font-size: clamp(2.4rem, 6vw, 3.6rem);
+      font-weight: 800;
+      line-height: 1.05;
+      letter-spacing: -0.02em;
+      color: #fff;
+    }
+
+    h1 span {
+      color: var(--cyan);
+    }
+
+    .subtitle {
+      margin-top: 14px;
+      color: var(--muted);
+      font-size: 0.95rem;
+      max-width: 480px;
+    }
+
+    /* Input area */
+    .input-section {
+      margin-bottom: 40px;
+    }
+
+    .input-label {
+      font-family: var(--mono);
+      font-size: 12px;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 10px;
+      display: block;
+    }
+
+    .input-row {
+      display: flex;
+      gap: 0;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      overflow: hidden;
+      transition: border-color 0.2s;
+    }
+
+    .input-row:focus-within {
+      border-color: var(--cyan);
+      box-shadow: 0 0 0 3px rgba(0, 212, 255, 0.08);
+    }
+
+    #password-input {
+      flex: 1;
+      background: var(--surface);
+      border: none;
+      outline: none;
+      padding: 14px 18px;
+      font-family: var(--mono);
+      font-size: 1rem;
+      color: #fff;
+      letter-spacing: 0.05em;
+    }
+
+    #password-input::placeholder {
+      color: var(--muted);
+      letter-spacing: 0.05em;
+    }
+
+    .toggle-btn {
+      background: var(--surface);
+      border: none;
+      border-left: 1px solid var(--border);
+      padding: 0 18px;
+      color: var(--muted);
+      cursor: pointer;
+      font-family: var(--mono);
+      font-size: 11px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      transition: color 0.2s;
+      white-space: nowrap;
+    }
+
+    .toggle-btn:hover { color: var(--cyan); }
+
+    .analyze-btn {
+      margin-top: 14px;
+      width: 100%;
+      padding: 14px;
+      background: transparent;
+      border: 1px solid var(--cyan);
+      border-radius: 6px;
+      color: var(--cyan);
+      font-family: var(--mono);
+      font-size: 13px;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: background 0.2s, color 0.2s;
+    }
+
+    .analyze-btn:hover {
+      background: var(--cyan);
+      color: var(--bg);
+    }
+
+    /* Results */
+    #results {
+      display: none;
+      animation: fadeUp 0.3s ease;
+    }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(10px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .meta-row {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 28px;
+    }
+
+    .meta-chip {
+      font-family: var(--mono);
+      font-size: 12px;
+      padding: 6px 12px;
+      border-radius: 4px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--text);
+    }
+
+    .meta-chip strong {
+      color: #fff;
+    }
+
+    /* Scenario cards */
+    .scenarios-label {
+      font-family: var(--mono);
+      font-size: 11px;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 14px;
+    }
+
+    .scenarios {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-bottom: 28px;
+    }
+
+    .scenario-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 16px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .scenario-name {
+      font-size: 0.88rem;
+      color: var(--muted);
+      flex: 1;
+    }
+
+    .scenario-time {
+      font-family: var(--mono);
+      font-size: 0.95rem;
+      color: #fff;
+      text-align: right;
+      white-space: nowrap;
+    }
+
+    .scenario-time.fast   { color: var(--magenta); }
+    .scenario-time.medium { color: var(--amber); }
+    .scenario-time.slow   { color: var(--cyan); }
+
+    /* Strength verdict */
+    .verdict {
+      border-radius: 6px;
+      padding: 20px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 28px;
+      border: 1px solid;
+    }
+
+    .verdict.very-weak   { border-color: var(--magenta); background: rgba(255,45,120,0.05); }
+    .verdict.weak        { border-color: #ff6b35;        background: rgba(255,107,53,0.05); }
+    .verdict.moderate    { border-color: var(--amber);   background: rgba(255,179,0,0.05); }
+    .verdict.strong      { border-color: #4dffb4;        background: rgba(77,255,180,0.05); }
+    .verdict.very-strong { border-color: var(--cyan);    background: rgba(0,212,255,0.05); }
+
+    .verdict-label {
+      font-size: 0.85rem;
+      color: var(--muted);
+      font-family: var(--mono);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+
+    .verdict-value {
+      font-weight: 700;
+      font-size: 1.1rem;
+      letter-spacing: -0.01em;
+    }
+
+    .verdict.very-weak   .verdict-value { color: var(--magenta); }
+    .verdict.weak        .verdict-value { color: #ff6b35; }
+    .verdict.moderate    .verdict-value { color: var(--amber); }
+    .verdict.strong      .verdict-value { color: #4dffb4; }
+    .verdict.very-strong .verdict-value { color: var(--cyan); }
+
+    /* Note */
+    .note {
+      font-size: 0.83rem;
+      color: var(--muted);
+      border-left: 2px solid var(--border);
+      padding-left: 14px;
+      line-height: 1.7;
+    }
+
+    /* Divider */
+    .divider {
+      border: none;
+      border-top: 1px solid var(--border);
+      margin: 36px 0;
+    }
+
+    /* Footer */
+    footer {
+      margin-top: 60px;
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--muted);
+      letter-spacing: 0.08em;
+      text-align: center;
+    }
+
+    footer a {
+      color: var(--cyan);
+      text-decoration: none;
+    }
+
+    footer a:hover { text-decoration: underline; }
+
+    @media (max-width: 480px) {
+      .scenario-card { flex-direction: column; align-items: flex-start; gap: 6px; }
+      .scenario-time { text-align: left; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrapper">
+    <header>
+      <p class="tag">Security Tool</p>
+      <h1>Break<span>Time</span></h1>
+      <p class="subtitle">Type a password. Find out how long it would take a brute force attack to crack it — across four real-world attack scenarios.</p>
+    </header>
+
+    <section class="input-section">
+      <label class="input-label" for="password-input">Your password</label>
+      <div class="input-row">
+        <input
+          id="password-input"
+          type="password"
+          placeholder="Enter a password to analyze"
+          autocomplete="off"
+          spellcheck="false"
+        />
+        <button class="toggle-btn" id="toggle-btn" onclick="toggleVisibility()">Show</button>
+      </div>
+      <button class="analyze-btn" onclick="analyze()">Analyze password</button>
+    </section>
+
+    <section id="results">
+      <div class="meta-row" id="meta-row"></div>
+
+      <p class="scenarios-label">Time to crack by attack type</p>
+      <div class="scenarios" id="scenarios"></div>
+
+      <div class="verdict" id="verdict">
+        <span class="verdict-label">Overall strength</span>
+        <span class="verdict-value" id="verdict-value"></span>
+      </div>
+
+      <hr class="divider" />
+
+      <p class="note">
+        This estimates brute force resistance only — how long it takes to try every possible combination.
+        Dictionary attacks or leaked password databases can crack passwords instantly regardless of complexity.
+        Use a password manager and never reuse passwords.
+      </p>
+    </section>
+
+    <footer>
+      Built by <a href="https://github.com/GentlemanNASA" target="_blank">GentlemanNASA</a>
+      &nbsp;·&nbsp;
+      <a href="https://github.com/GentlemanNASA/BreakTime" target="_blank">View source</a>
+      &nbsp;·&nbsp;
+      <a href="https://gentlemannasa.github.io" target="_blank">Portfolio</a>
+    </footer>
+  </div>
+
+  <script>
+    function toggleVisibility() {
+      const input = document.getElementById('password-input');
+      const btn = document.getElementById('toggle-btn');
+      if (input.type === 'password') {
+        input.type = 'text';
+        btn.textContent = 'Hide';
+      } else {
+        input.type = 'password';
+        btn.textContent = 'Show';
+      }
+    }
+
+    document.getElementById('password-input').addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') analyze();
+    });
+
+    function getCharsetSize(password) {
+      const hasLower  = /[a-z]/.test(password);
+      const hasUpper  = /[A-Z]/.test(password);
+      const hasDigit  = /[0-9]/.test(password);
+      const hasSymbol = /[^a-zA-Z0-9]/.test(password);
+
+      let size = 0;
+      const parts = [];
+      if (hasLower)  { size += 26; parts.push('lowercase'); }
+      if (hasUpper)  { size += 26; parts.push('uppercase'); }
+      if (hasDigit)  { size += 10; parts.push('digits'); }
+      if (hasSymbol) { size += 32; parts.push('symbols'); }
+
+      return { size, parts };
+    }
+
+    function humanizeTime(seconds) {
+      if (seconds < 1)           return { text: 'Less than a second', speed: 'fast' };
+      if (seconds < 60)          return { text: `${Math.floor(seconds)} seconds`, speed: 'fast' };
+      if (seconds < 3600)        return { text: `${Math.floor(seconds / 60)} minutes`, speed: 'fast' };
+      if (seconds < 86400)       return { text: `${Math.floor(seconds / 3600)} hours`, speed: 'fast' };
+      if (seconds < 31536000)    return { text: `${Math.floor(seconds / 86400)} days`, speed: 'medium' };
+      if (seconds < 3.154e9)     return { text: `${Math.floor(seconds / 31536000)} years`, speed: 'medium' };
+      if (seconds < 3.154e12)    return { text: `${Math.floor(seconds / 3.154e9).toLocaleString()} thousand years`, speed: 'slow' };
+      if (seconds < 3.154e15)    return { text: `${Math.floor(seconds / 3.154e12).toLocaleString()} million years`, speed: 'slow' };
+      return { text: 'Longer than civilization', speed: 'slow' };
+    }
+
+    function strengthLabel(seconds) {
+      if (seconds < 60)       return { label: 'Very Weak',   cls: 'very-weak' };
+      if (seconds < 86400)    return { label: 'Weak',        cls: 'weak' };
+      if (seconds < 31536000) return { label: 'Moderate',    cls: 'moderate' };
+      if (seconds < 3.154e9)  return { label: 'Strong',      cls: 'strong' };
+      return                         { label: 'Very Strong', cls: 'very-strong' };
+    }
+
+    function analyze() {
+      const password = document.getElementById('password-input').value;
+      if (!password) return;
+
+      const { size: charsetSize, parts } = getCharsetSize(password);
+      const length = password.length;
+
+      // Use BigInt for large keyspace, fall back to number for display
+      let keyspace;
+      try {
+        keyspace = BigInt(charsetSize) ** BigInt(length);
+      } catch(e) {
+        keyspace = Math.pow(charsetSize, length);
+      }
+
+      const keyspaceNum = Number(keyspace);
+
+      // Meta chips
+      const metaRow = document.getElementById('meta-row');
+      metaRow.innerHTML = `
+        <div class="meta-chip"><strong>${length}</strong> characters</div>
+        <div class="meta-chip">Sets: <strong>${parts.join(', ')}</strong></div>
+        <div class="meta-chip">Keyspace: <strong>${keyspace.toLocaleString()}</strong></div>
+      `;
+
+      // Scenarios
+      const scenarios = [
+        { name: 'Online attack (rate-limited)', speed: 100 },
+        { name: 'Offline — strong hash (bcrypt)', speed: 10_000 },
+        { name: 'Offline — weak hash (MD5)', speed: 10_000_000_000 },
+        { name: 'High-end GPU cluster', speed: 100_000_000_000 },
+      ];
+
+      const scenariosEl = document.getElementById('scenarios');
+      scenariosEl.innerHTML = '';
+      let worstCaseSeconds = 0;
+
+      scenarios.forEach(({ name, speed }) => {
+        const seconds = keyspaceNum / speed;
+        if (speed === 100_000_000_000) worstCaseSeconds = seconds;
+        const { text, speed: spd } = humanizeTime(seconds);
+
+        const card = document.createElement('div');
+        card.className = 'scenario-card';
+        card.innerHTML = `
+          <span class="scenario-name">${name}</span>
+          <span class="scenario-time ${spd}">${text}</span>
+        `;
+        scenariosEl.appendChild(card);
+      });
+
+      // Verdict
+      const { label, cls } = strengthLabel(worstCaseSeconds);
+      const verdictEl = document.getElementById('verdict');
+      verdictEl.className = `verdict ${cls}`;
+      document.getElementById('verdict-value').textContent = label;
+
+      // Show results
+      const resultsEl = document.getElementById('results');
+      resultsEl.style.display = 'block';
+      resultsEl.style.animation = 'none';
+      resultsEl.offsetHeight; // reflow
+      resultsEl.style.animation = 'fadeUp 0.3s ease';
+      resultsEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  </script>
+</body>
+</html>
